@@ -1,5 +1,6 @@
 // === CONFIG ===
-        const API_URL = "http://127.0.0.1:8000/chat"; // change if needed
+        const API_URL = "https://aidtm-rag.onrender.com/ask";
+
         const WELCOME_TEXT = "Hi, I’m AIDTM AI Bot. Ask me anything!";
 
         // === DOM ===
