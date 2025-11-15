@@ -30,7 +30,8 @@ docs = [f"Page {row['page']}: {row['chunk']}" for _, row in df.iterrows()]
 # ============================================================
 # 🔍 Build Embeddings + FAISS Index
 # ============================================================
-embed_model = SentenceTransformer("all-MiniLM-L6-v2")
+embed_model = SentenceTransformer("paraphrase-MiniLM-L3-v2")
+
 embeddings = embed_model.encode(docs, normalize_embeddings=True)
 
 dim = embeddings.shape[1]
