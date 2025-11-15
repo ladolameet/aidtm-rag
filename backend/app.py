@@ -22,26 +22,53 @@ ENDPOINT = (
 TEMPERATURE = 0.5
 
 # ============================================================
-# 📘 Load Handbook Chunks
+# 🔧 CHANGED — Lazy load CSV instead of loading at startup
 # ============================================================
-df = pd.read_csv("handbook_final.csv")     # columns: page | chunk
-docs = [f"Page {row['page']}: {row['chunk']}" for _, row in df.iterrows()]
+df = None
+docs = None
 
-# ============================================================
-# 🔍 Build Embeddings + FAISS Index
-# ============================================================
-embed_model = SentenceTransformer("paraphrase-MiniLM-L3-v2")
-
-embeddings = embed_model.encode(docs, normalize_embeddings=True)
-
-dim = embeddings.shape[1]
-index = faiss.IndexFlatIP(dim)
-index.add(np.array(embeddings))
-
-print("📚 FAISS Index Ready:", index.ntotal, "handbook chunks loaded")
+def load_handbook():
+    global df, docs
+    if df is None:   # only loads once
+        df = pd.read_csv("handbook_final.csv")
+        docs = [f"Page {row['page']}: {row['chunk']}" for _, row in df.iterrows()]
+    return df, docs
 
 # ============================================================
-# 🚀 FastAPI Setup + CORS (Frontend Compatible)
+# 🔧 CHANGED — Lazy load embedding model
+# ============================================================
+embed_model = None
+
+def load_model():
+    global embed_model
+    if embed_model is None:
+        embed_model = SentenceTransformer("paraphrase-MiniLM-L3-v2")
+    return embed_model
+
+# ============================================================
+# 🔧 CHANGED — Lazy FAISS creation (saves 200–300MB RAM)
+# ============================================================
+index = None
+
+def load_faiss():
+    global index
+    if index is None:
+        _, docs = load_handbook()
+        model = load_model()
+
+        print("🔧 Building embeddings (first request only)...")
+        embeddings = model.encode(docs, normalize_embeddings=True)
+
+        dim = embeddings.shape[1]
+        index = faiss.IndexFlatIP(dim)
+        index.add(np.array(embeddings))
+
+        print("📚 FAISS Index Ready:", index.ntotal, "chunks loaded")
+
+    return index
+
+# ============================================================
+# 🚀 FastAPI Setup + CORS
 # ============================================================
 app = FastAPI()
 
@@ -66,8 +93,12 @@ class Query(BaseModel):
 # 🤖 RAG + Gemini Function
 # ============================================================
 def rag_query_gemini(query, k=4):
+    df, docs = load_handbook()          # 🔧 loads only when needed
+    model = load_model()                # 🔧 loads only when needed
+    index = load_faiss()                # 🔧 loads only when needed
+
     # 1️⃣ Encode user query
-    q_emb = embed_model.encode([query], normalize_embeddings=True)
+    q_emb = model.encode([query], normalize_embeddings=True)
 
     # 2️⃣ Search FAISS
     scores, idxs = index.search(np.array(q_emb), k)
@@ -93,7 +124,6 @@ User Question:
 
 Give a clear and correct answer following the rules above.
 """
-
 
     # 4️⃣ Call Gemini API
     headers = {"Content-Type": "application/json"}
@@ -127,7 +157,6 @@ async def chat_api(request: Request):
         query = request.query_params.get("query", "")
         if not query:
             return {"error": "Query parameter is missing."}
-    # POST request support
     else:
         body = await request.json()
         query = body.get("query", "")
