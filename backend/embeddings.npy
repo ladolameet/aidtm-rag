@@ -1,0 +1,25 @@
+import pandas as pd
+import numpy as np
+import requests
+import os
+
+API_KEY = "YOUR_API_KEY"
+
+df = pd.read_csv("handbook_final.csv")
+texts = [f"Page {row['page']}: {row['chunk']}" for _, row in df.iterrows()]
+
+EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedText"
+
+emb_list = []
+
+for t in texts:
+    res = requests.post(
+        f"{EMBED_URL}?key={API_KEY}",
+        json={"text": t}
+    )
+    emb = res.json()["embedding"]["value"]
+    emb_list.append(emb)
+
+np.save("embeddings.npy", np.array(emb_list))
+
+print("Done: embeddings.npy created!")
