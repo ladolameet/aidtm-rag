@@ -23,7 +23,12 @@ df = pd.read_csv("handbook_final.csv")   # page | chunk
 texts = [f"Page {row['page']}: {row['chunk']}" for _, row in df.iterrows()]
 
 # 🔧 Load small numpy file of precomputed embeddings (<15MB)
-embeddings = np.load("embeddings.npy")
+embed_model = SentenceTransformer("all-MiniLM-L6-v2")
+embeddings = embed_model.encode(docs, normalize_embeddings=True)
+
+dim = embeddings.shape[1]
+index = faiss.IndexFlatIP(dim)
+index.add(np.array(embeddings))
 
 print("Ready with:", len(texts), "chunks")
 
